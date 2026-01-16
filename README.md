@@ -258,29 +258,3 @@ docker compose restart
 # Check database health
 docker compose ps
 ```
-
-## Changes from Milestone 1
-
-### ER Diagram Updates
-- **Weak Entity:** Changed from Registration to Workshop
-  - Workshop now has `workshop_number` as partial key
-  - Workshop depends on HackathonEvent
-- **IS-A Relationship:** Fixed notation to use proper triangle with (total, overlapping)
-- **Cardinalities:**
-  - "manages" corrected from M:M to 1:N
-  - "creates" corrected from M:1 to M:N
-
-### Student 2 Individual Changes
-- Added missing SQL query statement to Analytics Report Concept
-- Removed redundant IDs from NoSQL design (using MongoDB's `_id` as primary identifier)
-
-## Contact
-
-For questions about this project:
-- **Student:** Baur, Lennard (12018378)
-- **Course:** IMSE 2025W
-- **University:** Universität Wien
-
----
-
-**Last Updated:** January 2026

@@ -22,11 +22,15 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Routes will be added here
-// const mariadbRoutes = require('./routes/mariadb.routes');
-// const mongodbRoutes = require('./routes/mongodb.routes');
-// app.use('/api/mariadb', mariadbRoutes);
-// app.use('/api/mongodb', mongodbRoutes);
+// Import routes
+const mariadbRoutes = require('./routes/mariadb.routes');
+const mongodbRoutes = require('./routes/mongodb.routes');
+
+// Register routes
+app.use('/api/mariadb', mariadbRoutes);
+app.use('/api/mongodb', mongodbRoutes);
+
+console.log('✓ Routes registered: /api/mariadb, /api/mongodb');
 
 // Error handling middleware
 app.use((err, req, res, next) => {

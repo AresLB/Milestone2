@@ -2,6 +2,7 @@
 
 **Course:** 052400-1 VU Information Management and Systems Engineering (2025W)
 **Group:** 5
+**Student 1:** Aziz, Iftekher (12338137)
 **Student 2:** Baur, Lennard (12018378)
 
 ## Project Overview

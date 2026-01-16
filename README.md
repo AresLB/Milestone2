@@ -133,7 +133,7 @@ This command will:
 
 ### Step 3: Access the application
 
-* (Web interface): [http://localhost:3000](http://localhost:3000)
+* Frontend (Web interface): [http://localhost:3000](http://localhost:3000)
 
 ---
 

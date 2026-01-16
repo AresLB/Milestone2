@@ -10,7 +10,8 @@ const dbConfig = {
   connectionLimit: 10,
   queueLimit: 0,
   enableKeepAlive: true,
-  keepAliveInitialDelay: 0
+  keepAliveInitialDelay: 0,
+  multipleStatements: true  // Allow executing multiple SQL statements in one query
 };
 
 // Create connection pool

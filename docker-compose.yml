@@ -91,8 +91,8 @@ services:
     networks:
       - hackathon_network
     volumes:
-      - ./frontend/public:/usr/share/nginx/html:ro
-      - ./frontend/nginx/ssl:/etc/nginx/ssl:ro
+      - ./frontend/public:/usr/share/nginx/html:delegated
+      - ./frontend/nginx/ssl:/etc/nginx/ssl:delegated
     restart: unless-stopped
 
 networks:

@@ -7,21 +7,21 @@ RUN rm /etc/nginx/conf.d/default.conf
 # Copy custom Nginx configuration
 COPY nginx/nginx.conf /etc/nginx/conf.d/
 
-# Create directory for SSL certificates
-RUN mkdir -p /etc/nginx/ssl
+# Install OpenSSL
+RUN apk add --no-cache openssl
 
-# Generate self-signed SSL certificate
-RUN apk add --no-cache openssl && \
-    openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-    -keyout /etc/nginx/ssl/nginx-selfsigned.key \
-    -out /etc/nginx/ssl/nginx-selfsigned.crt \
-    -subj "/C=AT/ST=Vienna/L=Vienna/O=University/OU=IMSE/CN=localhost"
+# Copy custom entrypoint script
+COPY docker-entrypoint.sh /usr/local/bin/custom-entrypoint.sh
+RUN chmod +x /usr/local/bin/custom-entrypoint.sh
 
-# Copy static files
+# Copy static files and fix permissions for macOS Docker
 COPY public /usr/share/nginx/html
+RUN chmod -R 755 /usr/share/nginx/html && \
+    find /usr/share/nginx/html -type f -exec chmod 644 {} \;
 
 # Expose ports
 EXPOSE 80 443
 
-# Start Nginx
+# Use custom entrypoint that generates SSL certificates at runtime
+ENTRYPOINT ["/usr/local/bin/custom-entrypoint.sh"]
 CMD ["nginx", "-g", "daemon off;"]

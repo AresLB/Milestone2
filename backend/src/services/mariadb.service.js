@@ -300,26 +300,14 @@ class MariaDBService {
     const sqlPath = path.join(__dirname, '../../sql', filename);
     const sql = await fs.readFile(sqlPath, 'utf8');
 
-    // Split by semicolon but handle multi-line statements
-    const statements = sql
-      .split(';')
-      .map(stmt => stmt.trim())
-      .filter(stmt => stmt.length > 0 && !stmt.startsWith('--'));
-
     const connection = await pool.getConnection();
-    const results = [];
 
     try {
-      for (const statement of statements) {
-        if (statement.toUpperCase().startsWith('SELECT')) {
-          const [rows] = await connection.query(statement);
-          results.push(rows);
-        } else {
-          await connection.query(statement);
-        }
-      }
+      // Execute the entire SQL file at once to preserve session settings
+      // like SET FOREIGN_KEY_CHECKS
+      await connection.query(sql);
 
-      return { success: true, message: `Executed ${filename} successfully`, results };
+      return { success: true, message: `Executed ${filename} successfully` };
     } catch (error) {
       throw new Error(`Error executing ${filename}: ${error.message}`);
     } finally {

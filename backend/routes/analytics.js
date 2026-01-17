@@ -20,6 +20,8 @@ router.get('/submissions', async (req, res) => {
                 s.submission_time,
                 s.technology_stack,
                 s.repository_url,
+                e.name AS event_name,
+                e.event_type AS event_type,
                 
                 -- Participant Information (from Person and Participant entities)
                 p.person_id,
@@ -43,6 +45,7 @@ router.get('/submissions', async (req, res) => {
             INNER JOIN Creates c ON s.submission_id = c.submission_id
             INNER JOIN Participant pt ON c.person_id = pt.person_id
             INNER JOIN Person p ON pt.person_id = p.person_id
+            INNER JOIN HackathonEvent e ON s.event_id = e.event_id
             
             -- FILTER FIELD: Only include submissions within date range
             WHERE s.submission_time >= ? AND s.submission_time <= ?

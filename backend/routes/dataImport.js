@@ -439,7 +439,7 @@ async function generateMySQLData(pool) {
         // Added for use case: event_id (FK), submission_type
         // Relationship: creates (M:N with Participant)
         // ========================================
-        const submissions = [];
+        let submissions = [];
         for (let i = 0; i < 8; i++) {
             const eventIdx = i % events.length;
             const event = events[eventIdx];
@@ -477,6 +477,7 @@ async function generateMySQLData(pool) {
         // Constraint: Participants must be registered for the submission's event
         // ========================================
         let createsCount = 0;
+        const validSubmissions = [];
         for (let i = 0; i < submissions.length; i++) {
             const submission = submissions[i];
             
@@ -486,11 +487,26 @@ async function generateMySQLData(pool) {
                 [submission.eventId]
             );
             
-            if (registeredForEvent.length === 0) continue;
+            if (registeredForEvent.length === 0) {
+                await conn.query('DELETE FROM Submission WHERE submission_id = ?', [submission.id]);
+                continue;
+            }
             
             const registeredIds = registeredForEvent.map(r => r.person_id);
-            const numMembers = submission.type === 'individual' ? 1 : Math.min(randomInt(2, 3), registeredIds.length);
+            let finalType = submission.type;
+            if (finalType === 'team' && registeredIds.length < 2) {
+                finalType = 'individual';
+                await conn.query(
+                    'UPDATE Submission SET submission_type = ? WHERE submission_id = ?',
+                    [finalType, submission.id]
+                );
+            }
+            
+            const minMembers = finalType === 'team' ? 2 : 1;
+            const maxMembers = finalType === 'team' ? Math.min(3, registeredIds.length) : 1;
+            const numMembers = finalType === 'team' ? randomInt(minMembers, maxMembers) : 1;
             const usedParticipants = new Set();
+            let createdMembers = 0;
             
             for (let j = 0; j < numMembers; j++) {
                 let participantId;
@@ -507,9 +523,17 @@ async function generateMySQLData(pool) {
                         [participantId, submission.id]
                     );
                     createsCount++;
+                    createdMembers++;
                 }
             }
+            
+            if (createdMembers > 0) {
+                validSubmissions.push({ ...submission, type: finalType });
+            } else {
+                await conn.query('DELETE FROM Submission WHERE submission_id = ?', [submission.id]);
+            }
         }
+        submissions = validSubmissions;
 
         // ========================================
         // EVALUATES (Relationship - M:N with attributes)

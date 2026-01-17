@@ -290,9 +290,9 @@ async function loadSubmissions() {
                         </tr>
                     </thead>
                     <tbody>
-                        ${data.data.map(s => `
+                        ${data.data.map((s, index) => `
                             <tr>
-                                <td>${s.submission_id}</td>
+                                <td>${index + 1}</td>
                                 <td>${s.event_name || 'N/A'}</td>
                                 <td>${s.project_name}</td>
                                 <td><span class="badge ${s.submission_type === 'team' ? 'badge-info' : 'badge-success'}">${s.submission_type || 'N/A'}</span></td>
@@ -637,25 +637,23 @@ async function loadSubmissionAnalytics() {
                 <table class="data-table">
                     <thead>
                         <tr>
-                            <th>ID</th>
                             <th>Project</th>
+                            <th>Event</th>
                             <th>Participant</th>
                             <th>Email</th>
                             <th>Submitted</th>
                             <th>Days Since Reg</th>
-                            <th>Total Submissions</th>
                         </tr>
                     </thead>
                     <tbody>
                         ${data.data.map(r => `
                             <tr>
-                                <td>${r.submission_id}</td>
                                 <td>${r.project_name}</td>
+                                <td>${r.event_name || 'Unassigned'}</td>
                                 <td>${r.participant_first_name} ${r.participant_last_name}</td>
                                 <td>${r.participant_email}</td>
                                 <td>${new Date(r.submission_time).toLocaleString()}</td>
                                 <td>${r.days_since_registration}</td>
-                                <td>${r.total_submissions_by_participant}</td>
                             </tr>
                         `).join('')}
                     </tbody>

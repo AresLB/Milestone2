@@ -55,7 +55,7 @@ hackathon-system/
    ```
 
 2. **Access the application:**
-   - Open browser: http://localhost:3000
+   - Open browser: http://localhost:3001
 
 3. **Stop services:**
    ```bash

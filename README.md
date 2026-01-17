@@ -52,7 +52,7 @@ hackathon-system/
 
 1. **Start all services:**
    ```bash
-   cd hackathon-system
+   cd group05
    docker-compose up --build
    ```
 
@@ -68,7 +68,7 @@ hackathon-system/
    ```
 
 4. **Access the application:**
-   - Open browser: http://localhost:3010
+   - Open browser: http://localhost:3002
 
 ## Features
 

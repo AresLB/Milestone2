@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hackathon Management System</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <h1>🚀 Hackathon Management System</h1>
+        <p class="subtitle">Group 5 - Information Management and Systems Engineering (2025W)</p>
+    </header>
+
+    <nav>
+        <button class="nav-btn active" data-section="dashboard">Dashboard</button>
+        <button class="nav-btn" data-section="submit-project">Submit Project (S1)</button>
+        <button class="nav-btn" data-section="register-event">Register Event (S2)</button>
+        <button class="nav-btn" data-section="analytics-s1">Analytics Report (S1)</button>
+        <button class="nav-btn" data-section="analytics-s2">Analytics Report (S2)</button>
+        <button class="nav-btn" data-section="data-management">Data Management</button>
+    </nav>
+
+    <main>
+        <!-- Dashboard Section -->
+        <section id="dashboard" class="section active">
+            <h2>📊 Dashboard</h2>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h3>Total Events</h3>
+                    <p id="stat-events">-</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Total Participants</h3>
+                    <p id="stat-participants">-</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Total Submissions</h3>
+                    <p id="stat-submissions">-</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Total Registrations</h3>
+                    <p id="stat-registrations">-</p>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h3>Recent Submissions</h3>
+                <div id="recent-submissions">Loading...</div>
+            </div>
+
+            <div class="card">
+                <h3>System Health</h3>
+                <div id="health-status">Checking...</div>
+            </div>
+        </section>
+
+        <!-- Submit Project Section (Student 1's Use Case) -->
+        <section id="submit-project" class="section">
+            <h2>📝 Submit Hackathon Project</h2>
+            <p class="section-description">Student 1 Use Case: Submit Hackathon Project (IS-A Relationship - Participant inherits from Person)</p>
+            
+            <div class="card">
+                <form id="submit-project-form">
+                    <div class="form-group">
+                        <label for="project-name">Project Name *</label>
+                        <input type="text" id="project-name" required placeholder="Enter your project name">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="project-description">Description</label>
+                        <textarea id="project-description" rows="4" placeholder="Describe your project..."></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="tech-stack">Technology Stack</label>
+                        <input type="text" id="tech-stack" placeholder="e.g., React, Node.js, MongoDB">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="repo-url">Repository URL</label>
+                        <input type="url" id="repo-url" placeholder="https://github.com/...">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Team Members *</label>
+                        <p class="hint">Select one or more participants for your team</p>
+                        <div id="team-members-list" class="checkbox-list">
+                            Loading participants...
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">Submit Project</button>
+                </form>
+            </div>
+
+            <div class="card">
+                <h3>Current Submissions</h3>
+                <div id="submissions-list">Loading...</div>
+            </div>
+        </section>
+
+        <!-- Register Event Section (Student 2's Use Case) -->
+        <section id="register-event" class="section">
+            <h2>🎫 Register for Event</h2>
+            <p class="section-description">Student 2 Use Case: Register Participant for Event (Weak Entity - Registration)</p>
+            
+            <div class="card">
+                <form id="register-event-form">
+                    <div class="form-group">
+                        <label for="event-select">Select Event *</label>
+                        <select id="event-select" required>
+                            <option value="">-- Select an Event --</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="participant-select">Select Participant *</label>
+                        <select id="participant-select" required>
+                            <option value="">-- Select a Participant --</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="ticket-type">Ticket Type</label>
+                        <select id="ticket-type">
+                            <option value="Regular">Regular</option>
+                            <option value="Early Bird">Early Bird</option>
+                            <option value="VIP">VIP</option>
+                            <option value="Student">Student</option>
+                        </select>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">Register</button>
+                </form>
+            </div>
+
+            <div class="card">
+                <h3>Current Registrations</h3>
+                <div id="registrations-list">Loading...</div>
+            </div>
+        </section>
+
+        <!-- Analytics Report Section (Student 1) -->
+        <section id="analytics-s1" class="section">
+            <h2>📈 Analytics Report - Submission Statistics</h2>
+            <p class="section-description">Student 1 Analytics: Hackathon Submission Statistics (Filter: submission_time)</p>
+            
+            <div class="card">
+                <h3>Filter Options</h3>
+                <div class="filter-row">
+                    <div class="form-group">
+                        <label for="filter-start-date">Start Date</label>
+                        <input type="date" id="filter-start-date" value="2025-11-08">
+                    </div>
+                    <div class="form-group">
+                        <label for="filter-end-date">End Date</label>
+                        <input type="date" id="filter-end-date" value="2025-12-31">
+                    </div>
+                    <button class="btn btn-secondary" onclick="loadSubmissionAnalytics()">Apply Filter</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>Summary Statistics</h3>
+                <div id="analytics-s1-summary">Loading...</div>
+            </div>
+
+            <div class="card">
+                <h3>Detailed Report</h3>
+                <div id="analytics-s1-table">Loading...</div>
+            </div>
+        </section>
+
+        <!-- Analytics Report Section (Student 2) -->
+        <section id="analytics-s2" class="section">
+            <h2>📈 Analytics Report - Registration Statistics</h2>
+            <p class="section-description">Student 2 Analytics: Event Registration Statistics (Filter: event_type)</p>
+            
+            <div class="card">
+                <h3>Filter Options</h3>
+                <div class="filter-row">
+                    <div class="form-group">
+                        <label for="filter-event-type">Event Type</label>
+                        <select id="filter-event-type">
+                            <option value="Hackathon">Hackathon</option>
+                            <option value="Conference">Conference</option>
+                            <option value="Workshop">Workshop</option>
+                            <option value="Meetup">Meetup</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-secondary" onclick="loadRegistrationAnalytics()">Apply Filter</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>Registration Report</h3>
+                <div id="analytics-s2-table">Loading...</div>
+            </div>
+        </section>
+
+        <!-- Data Management Section -->
+        <section id="data-management" class="section">
+            <h2>⚙️ Data Management</h2>
+            <p class="section-description">Database setup and data import functionality</p>
+            
+            <div class="card warning-card">
+                <h3>⚠️ Import Randomized Data</h3>
+                <p>This will replace all existing data with fresh randomized data for testing purposes.</p>
+                <button id="import-data-btn" class="btn btn-danger">Import Data (Replace Existing)</button>
+                <div id="import-status"></div>
+            </div>
+
+            <div class="card">
+                <h3>🧩 Migrate to NoSQL</h3>
+                <p>Copies data from MySQL into MongoDB and clears NoSQL collections before import.</p>
+                <button id="migrate-nosql-btn" class="btn btn-secondary">Migrate to MongoDB</button>
+                <div id="migrate-status"></div>
+            </div>
+
+            <div class="card">
+                <h3>Current Database Statistics</h3>
+                <div id="db-stats">Loading...</div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>Group 5: Aziz Iftekher (12338137) & Baur Lennard (12018378)</p>
+        <p>University of Vienna - 2025W</p>
+    </footer>
+
+    <div id="toast" class="toast"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>

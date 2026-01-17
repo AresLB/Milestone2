@@ -1,55 +1,74 @@
-version: '3.8'
+# version: '3.8'
 
 services:
-  db:
-    image: mariadb:10.11
-    container_name: hackathon_db
+  mariadb:
+    image: mariadb:10.6
+    container_name: hackathon-mariadb
     restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_ROOT_PASSWORD: root123
       MYSQL_DATABASE: hackathon_db
       MYSQL_USER: hackathon_user
       MYSQL_PASSWORD: hackathon_pass
     ports:
       - "3306:3306"
     volumes:
-      - db_data:/var/lib/mysql
-      - ./sql/create.sql:/docker-entrypoint-initdb.d/01-create.sql
+      - mariadb_data:/var/lib/mysql
+      - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - hackathon-network
     healthcheck:
-      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
-      interval: 10s
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "hackathon_user", "-phackathon_pass"]
+      interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
+
+  mongodb:
+    image: mongo:6.0
+    container_name: hackathon-mongodb
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: root123
+      MONGO_INITDB_DATABASE: hackathon_db
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - hackathon-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: hackathon_backend
+    build: ./backend
+    container_name: hackathon-backend
     restart: always
     ports:
-      - "3001:3001"
+      - "3002:3002"
     environment:
-      DB_HOST: db
-      DB_PORT: 3306
-      DB_USER: hackathon_user
-      DB_PASSWORD: hackathon_pass
-      DB_NAME: hackathon_db
-      PORT: 3001
+      - DB_HOST=mariadb
+      - DB_USER=hackathon_user
+      - DB_PASSWORD=hackathon_pass
+      - DB_NAME=hackathon_db
+      - MONGO_URI=mongodb://root:root123@mongodb:27017/hackathon_db?authSource=admin
     depends_on:
-      db:
+      mariadb:
         condition: service_healthy
-
-  frontend:
-    build:
-      context: .
-      dockerfile: Dockerfile.frontend
-    container_name: hackathon_frontend
-    restart: always
-    ports:
-      - "3000:80"
-    depends_on:
-      - backend
+      mongodb:
+        condition: service_healthy
+    networks:
+      - hackathon-network
+    volumes:
+      - ./frontend:/app/../frontend
 
 volumes:
-  db_data:
+  mariadb_data:
+  mongodb_data:
+
+networks:
+  hackathon-network:
+    driver: bridge

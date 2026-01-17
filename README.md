@@ -1,166 +1,167 @@
 # Hackathon Management System
 
+**Group 5 - Information Management and Systems Engineering (2025W)**  
+- Student 1: Aziz Iftekher - 12338137  
+- Student 2: Baur Lennard - 12018378
+
 ## Project Overview
 
-This project is a **Hackathon Management System** developed as part of the
-**Information Management & Systems Engineering (IMSE)** course.
+This is a web-based hackathon management system that implements:
+- **Student 1 Use Case**: Submit Hackathon Project (IS-A Relationship)
+- **Student 2 Use Case**: Register Participant for Event (Weak Entity)
 
-The system provides functionality to:
+## Tech Stack
 
-* manage hackathon events
-* register participants
-* store project submissions
-* view analytics and statistics
-
-The implementation follows the requirements of **Milestone 2**, including:
-
-* containerized infrastructure
-* relational database setup
-* database initialization with schema
-* a modern web-based interface
-
----
-
-## System Infrastructure
-
-The project uses a **container-based architecture** with Docker.
-
-### Components
-
-* **Backend**
-
-  * Node.js with Express
-  * Provides REST API endpoints
-  * Connects to the MariaDB database
-  * Runs on port 3000
-
-* **Relational Database**
-
-  * MariaDB 10.11
-  * Stores events, participants, registrations, submissions, judges, sponsors, and workshops
-  * Uses a persistent Docker volume
-  * Schema initialized via SQL script on container startup
-
-* **Frontend**
-
-  * React 18 with TypeScript
-  * Vite build tool
-  * Tailwind CSS for styling
-  * shadcn/ui component library
-  * Pages: Home, Register Event, Submit Project, Analytics
-  * Served via Nginx on port 3000
-
-All components are started and connected using **Docker Compose**.
-
----
+- **Frontend**: HTML, CSS, Vanilla JavaScript
+- **Backend**: Node.js with Express.js
+- **Databases**: 
+  - MariaDB (RDBMS)
+  - MongoDB (NoSQL)
+- **Containerization**: Docker & Docker Compose
 
 ## Project Structure
 
-```text
-milestone2/
-├── docker-compose.yml      # Defines MariaDB, backend, and frontend services
-├── Dockerfile.frontend     # Multi-stage build: Node build + Nginx production
-├── index.html              # HTML entry point with root div for React
-├── package.json            # Frontend deps: React, TypeScript, Tailwind, shadcn/ui
-├── vite.config.ts          # Vite config with React plugin and path aliases
-├── tailwind.config.ts      # Tailwind CSS with dark mode and custom colors
-├── tsconfig.json           # TypeScript config with path aliases and ESM
-│
-├── backend/
-│   ├── Dockerfile          # Node 20-Alpine image running Express server
-│   ├── package.json        # Backend deps: Express, CORS, MySQL2
-│   └── server.js           # Express REST API with MariaDB connection pool
-│
-├── sql/
-│   └── create.sql          # Database schema: Person, Events, Submissions, etc.
-│
-└── src/
-    ├── App.tsx             # Root component with React Query, Router, routes
-    ├── main.tsx            # Entry point mounting React app into DOM
-    ├── components/
-    │   ├── Layout.tsx      # Header, nav bar, main content area, footer
-    │   ├── NavLink.tsx     # React Router NavLink wrapper with active state
-    │   └── ui/             # shadcn/ui components
-    ├── pages/
-    │   ├── Home.tsx        # Landing page with data import and feature cards
-    │   ├── RegisterEvent.tsx   # Event registration form for participants
-    │   ├── SubmitProject.tsx   # Project submission form (individual/team)
-    │   ├── Analytics.tsx       # Dashboard with Recharts visualizations
-    │   └── NotFound.tsx        # 404 error page with home navigation
-    ├── lib/
-    │   ├── api.ts          # API client with fetch wrapper and interfaces
-    │   ├── mockData.ts     # Sample data for demo mode
-    │   └── utils.ts        # Utility for className management (clsx + twMerge)
-    └── hooks/
-        ├── use-mobile.tsx  # Hook detecting mobile viewport (768px breakpoint)
-        └── use-toast.ts    # Toast notification system with auto-dismiss
 ```
-
----
+hackathon-system/
+├── docker-compose.yml      # Docker orchestration
+├── backend/
+│   ├── Dockerfile
+│   ├── package.json
+│   ├── server.js           # Main Express server
+│   └── routes/
+│       ├── dataImport.js   # Data import/generation
+│       ├── submissions.js  # Student 1 use case
+│       ├── registrations.js # Student 2 use case
+│       └── analytics.js    # Analytics reports
+├── frontend/
+│   ├── index.html
+│   ├── styles.css
+│   └── app.js
+└── sql/
+    └── init.sql            # Database schema
+```
 
 ## Prerequisites
 
-To run this project, you need:
+- Docker and Docker Compose installed
+- Node.js 18+ (for local development without Docker)
 
-* Docker
-* Docker Compose
+## Running with Docker (Recommended)
 
-No local installation of Node.js or MySQL is required, as everything runs inside containers.
+1. **Start all services:**
+   ```bash
+   cd hackathon-system
+   docker-compose up --build
+   ```
 
----
+2. **Access the application:**
+   - Open browser: http://localhost:3000
 
-## How to Run the Project
+3. **Stop services:**
+   ```bash
+   docker-compose down
+   ```
 
-### Step 1: Clone the repository
+4. **Stop and remove data:**
+   ```bash
+   docker-compose down -v
+   ```
 
-```sh
-git clone <YOUR_GIT_URL>
-cd <YOUR_PROJECT_FOLDER>
-```
+## Running Locally (Development)
 
-### Step 2: Build and start the system
+1. **Start MariaDB and MongoDB:**
+   ```bash
+   docker-compose up mariadb mongodb
+   ```
 
-```sh
-docker compose up --build
-```
-This command will:
+2. **Install backend dependencies:**
+   ```bash
+   cd backend
+   npm install
+   ```
 
-* build the frontend container (React app served via Nginx)
-* build the backend container (Node.js/Express API)
-* start the MariaDB database container
-* initialize the database schema from `sql/create.sql`
+3. **Set environment variables:**
+   ```bash
+   export DB_HOST=localhost
+   export DB_USER=hackathon_user
+   export DB_PASSWORD=hackathon_pass
+   export DB_NAME=hackathon_db
+   export MONGO_URI=mongodb://root:root123@localhost:27017/hackathon_db?authSource=admin
+   ```
 
-### Step 3: Access the application
+4. **Start the backend:**
+   ```bash
+   npm start
+   ```
 
-* Frontend (Web interface): [http://localhost:3000](http://localhost:3000) 
+5. **Access the application:**
+   - Open browser: http://localhost:3000
 
----
+## Features
 
-## Database Schema (Task 2.2.1)
+### Data Management (2.2.1)
+- **Import Data Button**: Generates randomized test data
+- Replaces existing data with fresh randomized data
+- Generates: Persons, Participants, Judges, Venues, Events, Sponsors, Submissions, Registrations
 
-The database schema is defined in `sql/create.sql` and includes the following tables:
+### Submit Hackathon Project (Student 1)
+- Create individual or team submissions
+- Select team members from registered participants
+- Specify project details (name, description, tech stack, repository URL)
+- Creates records in `Submission` and `Creates` tables (M:N relationship)
 
-* **Person** - Base entity for participants and judges (ISA relationship)
-* **Participant** - Extends Person with hackathon-specific attributes
-* **Judge** - Extends Person with judging expertise
-* **InnovationManager** - Recursive relationship for participant mentorship
-* **Venue** - Event locations
-* **Sponsor** - Event sponsors with tier levels
-* **HackathonEvent** - Main event entity
-* **Workshop** - Workshops within events
-* **Supports** - M:N relationship between Sponsors and Events
-* **Registration** - Participant event registrations
-* **Submission** - Project submissions
-* **Creates** - M:N relationship between Participants and Submissions
-* **Evaluates** - Judge scores and feedback for submissions
+### Register for Event (Student 2)
+- Register participants for hackathon events
+- Check event capacity before registration
+- Track payment status and ticket types
+- Creates records in `Registration` table (weak entity with composite key)
 
-The schema is automatically applied when the database container starts for the first time.
-This fulfills the **DB Setup / Data Import / Base Function** requirement of Milestone 2.
+### Analytics Reports
 
----
+**Student 1 Report**: Submission Statistics
+- Filter by submission_time
+- Shows participant engagement metrics
+- Technology stack usage analysis
 
-## Notes
+**Student 2 Report**: Registration Statistics
+- Filter by event_type
+- Shows capacity utilization
+- Payment status breakdown
 
-* No external authentication providers or third-party services are used.
-* The setup is designed to be reproducible on a clean machine using Docker.
-* Database credentials are configured in `docker-compose.yml` for development purposes.
+## API Endpoints
+
+### Data Management
+- `POST /api/data/import` - Import randomized data
+- `GET /api/data/stats` - Get database statistics
+
+### Submissions (Student 1)
+- `GET /api/submissions` - List all submissions
+- `GET /api/submissions/participants` - Get available participants
+- `POST /api/submissions` - Create new submission
+- `DELETE /api/submissions/:id` - Delete submission
+
+### Registrations (Student 2)
+- `GET /api/registrations` - List all registrations
+- `GET /api/registrations/events` - Get available events
+- `POST /api/registrations` - Create new registration
+- `DELETE /api/registrations/:personId/:eventId` - Cancel registration
+
+### Analytics
+- `GET /api/analytics/submissions` - Submission analytics (Student 1)
+- `GET /api/analytics/registrations` - Registration analytics (Student 2)
+- `GET /api/analytics/summary` - Overall statistics
+
+## Database Schema
+
+The system uses the ER diagram from Milestone 1 with these main entities:
+- Person (superclass)
+- Participant (IS-A Person)
+- Judge (IS-A Person)
+- Venue
+- HackathonEvent
+- Sponsor
+- Submission
+- Workshop (weak entity)
+- Registration (relationship with attributes)
+
+See `sql/init.sql` for complete schema.

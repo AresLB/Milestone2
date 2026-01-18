@@ -2,6 +2,10 @@
 const API_BASE = '/api';
 let editingSubmissionId = null;
 
+// Database mode for Student 2 (workshops)
+let workshopDbMode = 'sql'; // 'sql' or 'nosql'
+let analyticsS2DbMode = 'sql'; // 'sql' or 'nosql'
+
 // DOM Elements
 const navButtons = document.querySelectorAll('.nav-btn');
 const sections = document.querySelectorAll('.section');
@@ -479,9 +483,34 @@ async function deleteSubmission(id) {
 
 let editingWorkshop = null; // Stores {event_id, workshop_number} when editing
 
+// Toggle database mode for workshops
+function setWorkshopDbMode(mode) {
+    workshopDbMode = mode;
+
+    // Update toggle button states
+    const toggleBtns = document.querySelectorAll('#manage-workshops .toggle-btn');
+    toggleBtns.forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.db === mode);
+    });
+
+    // Update hint text
+    const hint = document.getElementById('workshop-db-hint');
+    if (hint) {
+        const dbName = mode === 'sql' ? 'SQL (MariaDB)' : 'NoSQL (MongoDB)';
+        hint.innerHTML = `Currently using: <strong>${dbName}</strong>`;
+    }
+
+    // Reset form and reload data
+    resetWorkshopForm();
+    loadEventsForWorkshops();
+    loadWorkshops();
+}
+
 async function loadEventsForWorkshops() {
     try {
-        const data = await apiCall('/workshops/events');
+        // Use different endpoint based on database mode
+        const endpoint = workshopDbMode === 'sql' ? '/workshops/events' : '/nosql/workshops/events';
+        const data = await apiCall(endpoint);
 
         const selectHtml = data.data.map(e =>
             `<option value="${e.event_id}">${e.name} - ${new Date(e.start_date).toLocaleDateString()} [${e.workshop_count} workshops]</option>`
@@ -498,7 +527,8 @@ async function loadEventsForWorkshops() {
 
 async function loadWorkshops() {
     try {
-        const data = await apiCall('/workshops');
+        const endpoint = workshopDbMode === 'sql' ? '/workshops' : '/nosql/workshops';
+        const data = await apiCall(endpoint);
 
         const tableHtml = data.data.length > 0
             ? `<div class="table-wrapper">
@@ -555,7 +585,10 @@ function resetWorkshopForm() {
 
 async function startEditWorkshop(eventId, workshopNumber) {
     try {
-        const result = await apiCall(`/workshops/${eventId}/${workshopNumber}`);
+        const endpoint = workshopDbMode === 'sql'
+            ? `/workshops/${eventId}/${workshopNumber}`
+            : `/nosql/workshops/${eventId}/${workshopNumber}`;
+        const result = await apiCall(endpoint);
         const workshop = result.data;
 
         if (!workshop) {
@@ -606,14 +639,18 @@ document.getElementById('workshop-form').addEventListener('submit', async (e) =>
         let result;
         if (editingWorkshop) {
             // Update existing workshop
-            result = await apiCall(`/workshops/${editingWorkshop.event_id}/${editingWorkshop.workshop_number}`, {
+            const endpoint = workshopDbMode === 'sql'
+                ? `/workshops/${editingWorkshop.event_id}/${editingWorkshop.workshop_number}`
+                : `/nosql/workshops/${editingWorkshop.event_id}/${editingWorkshop.workshop_number}`;
+            result = await apiCall(endpoint, {
                 method: 'PUT',
                 body: JSON.stringify(workshopData)
             });
             showToast('Workshop updated successfully!', 'success');
         } else {
             // Create new workshop
-            result = await apiCall('/workshops', {
+            const endpoint = workshopDbMode === 'sql' ? '/workshops' : '/nosql/workshops';
+            result = await apiCall(endpoint, {
                 method: 'POST',
                 body: JSON.stringify(workshopData)
             });
@@ -638,7 +675,10 @@ async function deleteWorkshop(eventId, workshopNumber) {
     if (!confirm('Are you sure you want to delete this workshop?')) return;
 
     try {
-        await apiCall(`/workshops/${eventId}/${workshopNumber}`, { method: 'DELETE' });
+        const endpoint = workshopDbMode === 'sql'
+            ? `/workshops/${eventId}/${workshopNumber}`
+            : `/nosql/workshops/${eventId}/${workshopNumber}`;
+        await apiCall(endpoint, { method: 'DELETE' });
         showToast('Workshop deleted successfully', 'success');
         loadWorkshops();
         loadEventsForWorkshops();
@@ -718,11 +758,35 @@ async function loadSubmissionAnalytics() {
 
 // ==================== ANALYTICS (Student 2) ====================
 
+// Toggle database mode for analytics S2
+function setAnalyticsS2DbMode(mode) {
+    analyticsS2DbMode = mode;
+
+    // Update toggle button states
+    const toggleBtns = document.querySelectorAll('#analytics-s2 .toggle-btn');
+    toggleBtns.forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.db === mode);
+    });
+
+    // Update hint text
+    const hint = document.getElementById('analytics-s2-db-hint');
+    if (hint) {
+        const dbName = mode === 'sql' ? 'SQL (MariaDB)' : 'NoSQL (MongoDB)';
+        hint.innerHTML = `Currently using: <strong>${dbName}</strong>`;
+    }
+
+    // Reload analytics data
+    loadWorkshopAnalytics();
+}
+
 async function loadWorkshopAnalytics() {
     const skillLevel = document.getElementById('filter-skill-level').value;
 
     try {
-        const data = await apiCall(`/analytics/workshops?skillLevel=${skillLevel}`);
+        const endpoint = analyticsS2DbMode === 'sql'
+            ? `/analytics/workshops?skillLevel=${skillLevel}`
+            : `/nosql/analytics/workshops?skillLevel=${skillLevel}`;
+        const data = await apiCall(endpoint);
 
         // Summary section
         const summaryHtml = `

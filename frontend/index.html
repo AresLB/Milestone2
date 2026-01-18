@@ -171,6 +171,15 @@
             <p class="section-description">Student 2 Use Case: Manage Workshops (Weak Entity - Workshop depends on HackathonEvent)</p>
 
             <div class="card">
+                <h3>Database Mode</h3>
+                <div class="db-toggle">
+                    <button class="toggle-btn active" data-db="sql" onclick="setWorkshopDbMode('sql')">SQL (MariaDB)</button>
+                    <button class="toggle-btn" data-db="nosql" onclick="setWorkshopDbMode('nosql')">NoSQL (MongoDB)</button>
+                </div>
+                <p class="hint" id="workshop-db-hint">Currently using: <strong>SQL (MariaDB)</strong></p>
+            </div>
+
+            <div class="card">
                 <form id="workshop-form">
                     <div class="form-group">
                         <label for="workshop-event-select">Select Event *</label>
@@ -226,6 +235,15 @@
         <section id="analytics-s2" class="section">
             <h2>📈 Analytics Report - Workshop Statistics</h2>
             <p class="section-description">Student 2 Analytics: Workshop Statistics (Filter: skill_level) - Involves Workshop (Weak Entity), HackathonEvent, Venue</p>
+
+            <div class="card">
+                <h3>Database Mode</h3>
+                <div class="db-toggle">
+                    <button class="toggle-btn active" data-db="sql" onclick="setAnalyticsS2DbMode('sql')">SQL (MariaDB)</button>
+                    <button class="toggle-btn" data-db="nosql" onclick="setAnalyticsS2DbMode('nosql')">NoSQL (MongoDB)</button>
+                </div>
+                <p class="hint" id="analytics-s2-db-hint">Currently using: <strong>SQL (MariaDB)</strong></p>
+            </div>
 
             <div class="card">
                 <h3>Filter Options</h3>

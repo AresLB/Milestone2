@@ -330,4 +330,424 @@ router.get('/stats', async (req, res) => {
     }
 });
 
+// ==================== NOSQL WORKSHOP ENDPOINTS (Student 2 - Use Case 2.3.3) ====================
+
+// GET /api/nosql/workshops - Get all workshops from MongoDB (embedded in events)
+router.get('/workshops', async (req, res) => {
+    try {
+        const mongoDB = req.mongoDB;
+        if (!mongoDB) {
+            return res.status(503).json({ success: false, error: 'MongoDB not connected' });
+        }
+
+        // Unwind workshops from events and project the needed fields
+        const workshops = await mongoDB.collection('events').aggregate([
+            { $unwind: { path: '$workshops', preserveNullAndEmptyArrays: false } },
+            {
+                $project: {
+                    workshop_number: '$workshops.workshop_number',
+                    event_id: '$_id',
+                    title: '$workshops.title',
+                    description: '$workshops.description',
+                    duration: '$workshops.duration',
+                    skill_level: '$workshops.skill_level',
+                    max_attendees: '$workshops.max_attendees',
+                    event_name: '$name',
+                    start_date: '$start_date',
+                    end_date: '$end_date',
+                    venue_name: '$venue.name'
+                }
+            },
+            { $sort: { start_date: 1, workshop_number: 1 } }
+        ]).toArray();
+
+        res.json({ success: true, data: workshops });
+    } catch (error) {
+        console.error('NoSQL get workshops error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// GET /api/nosql/workshops/events - Get all events for dropdown (with workshop count)
+router.get('/workshops/events', async (req, res) => {
+    try {
+        const mongoDB = req.mongoDB;
+        if (!mongoDB) {
+            return res.status(503).json({ success: false, error: 'MongoDB not connected' });
+        }
+
+        const events = await mongoDB.collection('events').aggregate([
+            {
+                $project: {
+                    event_id: '$_id',
+                    name: 1,
+                    start_date: 1,
+                    end_date: 1,
+                    event_type: 1,
+                    venue_name: '$venue.name',
+                    workshop_count: { $size: { $ifNull: ['$workshops', []] } }
+                }
+            },
+            { $sort: { start_date: 1 } }
+        ]).toArray();
+
+        res.json({ success: true, data: events });
+    } catch (error) {
+        console.error('NoSQL get events error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// GET /api/nosql/workshops/:eventId/:workshopNumber - Get single workshop
+router.get('/workshops/:eventId/:workshopNumber', async (req, res) => {
+    try {
+        const mongoDB = req.mongoDB;
+        if (!mongoDB) {
+            return res.status(503).json({ success: false, error: 'MongoDB not connected' });
+        }
+
+        const eventId = parseInt(req.params.eventId);
+        const workshopNumber = parseInt(req.params.workshopNumber);
+
+        const event = await mongoDB.collection('events').findOne({ _id: eventId });
+        if (!event) {
+            return res.status(404).json({ success: false, error: 'Event not found' });
+        }
+
+        const workshop = (event.workshops || []).find(w => w.workshop_number === workshopNumber);
+        if (!workshop) {
+            return res.status(404).json({ success: false, error: 'Workshop not found' });
+        }
+
+        res.json({
+            success: true,
+            data: {
+                ...workshop,
+                event_id: eventId,
+                event_name: event.name,
+                start_date: event.start_date,
+                end_date: event.end_date,
+                venue_name: event.venue?.name,
+                venue_address: event.venue?.address
+            }
+        });
+    } catch (error) {
+        console.error('NoSQL get workshop error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// POST /api/nosql/workshops - Create new workshop (add to event's workshops array)
+router.post('/workshops', async (req, res) => {
+    try {
+        const mongoDB = req.mongoDB;
+        if (!mongoDB) {
+            return res.status(503).json({ success: false, error: 'MongoDB not connected' });
+        }
+
+        const { event_id, title, description, duration, skill_level, max_attendees } = req.body;
+
+        if (!event_id || !title) {
+            return res.status(400).json({ success: false, error: 'Event and workshop title are required' });
+        }
+
+        // Find the event
+        const event = await mongoDB.collection('events').findOne({ _id: parseInt(event_id) });
+        if (!event) {
+            return res.status(404).json({ success: false, error: 'Event not found' });
+        }
+
+        // Calculate next workshop number for this event
+        const existingWorkshops = event.workshops || [];
+        const maxNumber = existingWorkshops.reduce((max, w) => Math.max(max, w.workshop_number || 0), 0);
+        const nextWorkshopNumber = maxNumber + 1;
+
+        const newWorkshop = {
+            workshop_number: nextWorkshopNumber,
+            title: title,
+            description: description || '',
+            duration: duration || 60,
+            skill_level: skill_level || 'Beginner',
+            max_attendees: max_attendees || 30
+        };
+
+        // Push the new workshop to the event's workshops array
+        await mongoDB.collection('events').updateOne(
+            { _id: parseInt(event_id) },
+            { $push: { workshops: newWorkshop } }
+        );
+
+        res.status(201).json({
+            success: true,
+            message: `Workshop "${title}" created for ${event.name}`,
+            data: {
+                workshop_number: nextWorkshopNumber,
+                event_id: parseInt(event_id),
+                title: title
+            }
+        });
+    } catch (error) {
+        console.error('NoSQL create workshop error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// PUT /api/nosql/workshops/:eventId/:workshopNumber - Update workshop
+router.put('/workshops/:eventId/:workshopNumber', async (req, res) => {
+    try {
+        const mongoDB = req.mongoDB;
+        if (!mongoDB) {
+            return res.status(503).json({ success: false, error: 'MongoDB not connected' });
+        }
+
+        const eventId = parseInt(req.params.eventId);
+        const workshopNumber = parseInt(req.params.workshopNumber);
+        const { title, description, duration, skill_level, max_attendees } = req.body;
+
+        if (!title) {
+            return res.status(400).json({ success: false, error: 'Workshop title is required' });
+        }
+
+        // Update the specific workshop in the array using arrayFilters
+        const result = await mongoDB.collection('events').updateOne(
+            { _id: eventId, 'workshops.workshop_number': workshopNumber },
+            {
+                $set: {
+                    'workshops.$.title': title,
+                    'workshops.$.description': description || '',
+                    'workshops.$.duration': duration || 60,
+                    'workshops.$.skill_level': skill_level || 'Beginner',
+                    'workshops.$.max_attendees': max_attendees || 30
+                }
+            }
+        );
+
+        if (result.matchedCount === 0) {
+            return res.status(404).json({ success: false, error: 'Workshop not found' });
+        }
+
+        res.json({ success: true, message: 'Workshop updated successfully' });
+    } catch (error) {
+        console.error('NoSQL update workshop error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// DELETE /api/nosql/workshops/:eventId/:workshopNumber - Delete workshop
+router.delete('/workshops/:eventId/:workshopNumber', async (req, res) => {
+    try {
+        const mongoDB = req.mongoDB;
+        if (!mongoDB) {
+            return res.status(503).json({ success: false, error: 'MongoDB not connected' });
+        }
+
+        const eventId = parseInt(req.params.eventId);
+        const workshopNumber = parseInt(req.params.workshopNumber);
+
+        // Remove the workshop from the array
+        const result = await mongoDB.collection('events').updateOne(
+            { _id: eventId },
+            { $pull: { workshops: { workshop_number: workshopNumber } } }
+        );
+
+        if (result.matchedCount === 0) {
+            return res.status(404).json({ success: false, error: 'Event not found' });
+        }
+
+        if (result.modifiedCount === 0) {
+            return res.status(404).json({ success: false, error: 'Workshop not found' });
+        }
+
+        res.json({ success: true, message: 'Workshop deleted successfully' });
+    } catch (error) {
+        console.error('NoSQL delete workshop error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// POST /api/nosql/indexes/create - Create indexes for workshop analytics (Student 2 - Task 2.3.5)
+router.post('/indexes/create', async (req, res) => {
+    try {
+        const mongoDB = req.mongoDB;
+        if (!mongoDB) {
+            return res.status(503).json({ success: false, error: 'MongoDB not connected' });
+        }
+
+        // Create index on workshops.skill_level for filtering
+        const indexResult = await mongoDB.collection('events').createIndex(
+            { 'workshops.skill_level': 1 },
+            { name: 'idx_workshops_skill_level' }
+        );
+
+        // Create compound index for sorting
+        const indexResult2 = await mongoDB.collection('events').createIndex(
+            { 'start_date': 1 },
+            { name: 'idx_events_start_date' }
+        );
+
+        res.json({
+            success: true,
+            message: 'Indexes created successfully',
+            indexes: [indexResult, indexResult2]
+        });
+    } catch (error) {
+        console.error('Index creation error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// GET /api/nosql/indexes/list - List all indexes on events collection
+router.get('/indexes/list', async (req, res) => {
+    try {
+        const mongoDB = req.mongoDB;
+        if (!mongoDB) {
+            return res.status(503).json({ success: false, error: 'MongoDB not connected' });
+        }
+
+        const indexes = await mongoDB.collection('events').indexes();
+        res.json({ success: true, indexes });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// GET /api/nosql/analytics/workshops/explain - Get execution stats for analytics query
+router.get('/analytics/workshops/explain', async (req, res) => {
+    try {
+        const mongoDB = req.mongoDB;
+        if (!mongoDB) {
+            return res.status(503).json({ success: false, error: 'MongoDB not connected' });
+        }
+
+        const { skillLevel } = req.query;
+        const filterSkillLevel = skillLevel || 'all';
+
+        // Build the same pipeline as the analytics query
+        const pipeline = [
+            { $unwind: { path: '$workshops', preserveNullAndEmptyArrays: false } }
+        ];
+
+        if (filterSkillLevel !== 'all') {
+            pipeline.push({ $match: { 'workshops.skill_level': filterSkillLevel } });
+        }
+
+        pipeline.push({
+            $project: {
+                workshop_number: '$workshops.workshop_number',
+                event_id: '$_id',
+                workshop_title: '$workshops.title',
+                skill_level: '$workshops.skill_level',
+                duration: '$workshops.duration',
+                event_name: '$name',
+                venue_name: '$venue.name'
+            }
+        });
+
+        // Get execution stats using explain
+        const explainResult = await mongoDB.collection('events')
+            .aggregate(pipeline)
+            .explain('executionStats');
+
+        res.json({
+            success: true,
+            filter: { skillLevel: filterSkillLevel },
+            executionStats: {
+                totalDocsExamined: explainResult.stages?.[0]?.['$cursor']?.executionStats?.totalDocsExamined || 'N/A',
+                executionTimeMillis: explainResult.stages?.[0]?.['$cursor']?.executionStats?.executionTimeMillis || 'N/A',
+                indexesUsed: explainResult.stages?.[0]?.['$cursor']?.queryPlanner?.winningPlan?.inputStage?.indexName || 'COLLSCAN (no index)'
+            },
+            fullExplain: explainResult
+        });
+    } catch (error) {
+        console.error('Explain error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// GET /api/nosql/analytics/workshops - Workshop Analytics Report (Student 2)
+router.get('/analytics/workshops', async (req, res) => {
+    try {
+        const mongoDB = req.mongoDB;
+        if (!mongoDB) {
+            return res.status(503).json({ success: false, error: 'MongoDB not connected' });
+        }
+
+        const { skillLevel } = req.query;
+        const filterSkillLevel = skillLevel || 'all';
+
+        // Build aggregation pipeline
+        const pipeline = [
+            { $unwind: { path: '$workshops', preserveNullAndEmptyArrays: false } }
+        ];
+
+        // Add filter if skill level is specified
+        if (filterSkillLevel !== 'all') {
+            pipeline.push({ $match: { 'workshops.skill_level': filterSkillLevel } });
+        }
+
+        // Project the fields we need
+        pipeline.push({
+            $project: {
+                workshop_number: '$workshops.workshop_number',
+                event_id: '$_id',
+                workshop_title: '$workshops.title',
+                workshop_description: '$workshops.description',
+                duration: '$workshops.duration',
+                skill_level: '$workshops.skill_level',
+                max_attendees: '$workshops.max_attendees',
+                event_name: '$name',
+                event_type: '$event_type',
+                start_date: '$start_date',
+                end_date: '$end_date',
+                event_max_participants: '$max_participants',
+                venue_id: '$venue.venue_id',
+                venue_name: '$venue.name',
+                venue_address: '$venue.address',
+                venue_capacity: '$venue.capacity',
+                venue_facilities: '$venue.facilities'
+            }
+        });
+
+        pipeline.push({ $sort: { start_date: 1, workshop_number: 1 } });
+
+        const results = await mongoDB.collection('events').aggregate(pipeline).toArray();
+
+        // Calculate summary statistics
+        const totalWorkshops = results.length;
+        const uniqueEvents = [...new Set(results.map(r => r.event_id))].length;
+        const totalDuration = results.reduce((sum, r) => sum + (r.duration || 0), 0);
+        const avgDuration = totalWorkshops > 0 ? Math.round(totalDuration / totalWorkshops) : 0;
+
+        // Skill level distribution
+        const skillDistribution = {};
+        results.forEach(r => {
+            skillDistribution[r.skill_level] = (skillDistribution[r.skill_level] || 0) + 1;
+        });
+
+        // Add workshops_per_event to each result
+        const workshopCountByEvent = {};
+        results.forEach(r => {
+            workshopCountByEvent[r.event_id] = (workshopCountByEvent[r.event_id] || 0) + 1;
+        });
+        results.forEach(r => {
+            r.workshops_per_event = workshopCountByEvent[r.event_id];
+        });
+
+        res.json({
+            success: true,
+            filter: { skillLevel: filterSkillLevel },
+            summary: {
+                totalWorkshops,
+                uniqueEvents,
+                averageDuration: avgDuration,
+                skillDistribution
+            },
+            data: results
+        });
+    } catch (error) {
+        console.error('NoSQL analytics error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 module.exports = router;

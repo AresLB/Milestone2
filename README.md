@@ -76,7 +76,7 @@ group05/
 
    ```bash
    cd group05
-   docker-compose up --build
+   docker compose up --build
    ```
 
 2. **Access the application:**
@@ -111,4 +111,4 @@ const PORT = process.env.PORT || 3000;
 3. **Access the application:**
 
    * Open a browser and navigate to:
-     [http://localhost:3001](http://localhost:3001)
+     [http://localhost:3000](http://localhost:3000)

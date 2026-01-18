@@ -470,3 +470,39 @@ footer p {
 .checkbox-list.individual-mode .checkbox-item:has(input:not(:checked)) {
     opacity: 0.5;
 }
+
+/* Database Toggle Buttons */
+.db-toggle {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.toggle-btn {
+    padding: 0.5rem 1rem;
+    border: 2px solid #e2e8f0;
+    background: white;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #4a5568;
+    transition: all 0.2s;
+}
+
+.toggle-btn:hover {
+    border-color: #3182ce;
+    color: #3182ce;
+}
+
+.toggle-btn.active[data-db="sql"] {
+    background: #3182ce;
+    border-color: #3182ce;
+    color: white;
+}
+
+.toggle-btn.active[data-db="nosql"] {
+    background: #38a169;
+    border-color: #38a169;
+    color: white;
+}

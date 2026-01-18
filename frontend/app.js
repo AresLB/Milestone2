@@ -794,9 +794,12 @@ async function loadDbStats() {
     try {
         const data = await apiCall('/data/stats');
         
+        const excludedTables = ['Creates', 'Evaluates', 'Supports'];
+        const filteredStats = Object.entries(data.stats).filter(([table]) => !excludedTables.includes(table));
+
         const statsHtml = `
             <div class="summary-grid">
-                ${Object.entries(data.stats).map(([table, count]) => `
+                ${filteredStats.map(([table, count]) => `
                     <div class="summary-item">
                         <div class="value">${count}</div>
                         <div class="label">${table}</div>
@@ -861,10 +864,13 @@ document.getElementById('import-data-btn').addEventListener('click', async () =>
     try {
         const result = await apiCall('/data/import', { method: 'POST' });
         
+        const excludedTables = ['Creates', 'Evaluates', 'Supports'];
+        const filteredStats = Object.entries(result.stats).filter(([table]) => !excludedTables.includes(table));
+
         statusDiv.innerHTML = `
             <p class="badge badge-success">Data imported successfully!</p>
             <div class="summary-grid" style="margin-top: 1rem;">
-                ${Object.entries(result.stats).map(([key, value]) => `
+                ${filteredStats.map(([key, value]) => `
                     <div class="summary-item">
                         <div class="value">${value}</div>
                         <div class="label">${key}</div>

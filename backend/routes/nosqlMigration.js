@@ -270,6 +270,10 @@ router.post('/migrate', async (req, res) => {
             };
         });
 
+        const totalEmbeddedWorkshops = eventDocs.reduce((sum, doc) => {
+            return sum + (doc.workshops ? doc.workshops.length : 0);
+        }, 0);
+
         const insertOps = [];
         if (participantDocs.length) insertOps.push(mongoDB.collection('participants').insertMany(participantDocs));
         if (eventDocs.length) insertOps.push(mongoDB.collection('events').insertMany(eventDocs));
@@ -284,6 +288,7 @@ router.post('/migrate', async (req, res) => {
                 participants: participantDocs.length,
                 events: eventDocs.length,
                 submissions: submissionDocs.length,
+                'workshops (embedded)': totalEmbeddedWorkshops,
                 warnings_reg_missing_event: warnings.registrations_missing_event,
                 warnings_reg_missing_person: warnings.registrations_missing_person,
                 warnings_creates_missing_submission: warnings.creates_missing_submission,

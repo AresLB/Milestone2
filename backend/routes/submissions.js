@@ -1,140 +1,6 @@
 const express = require('express');
 const router = express.Router();
 
-function buildEventSnapshot(eventRow) {
-    if (!eventRow || !eventRow.event_id) return null;
-    return {
-        event_id: eventRow.event_id,
-        name: eventRow.event_name,
-        event_type: eventRow.event_type,
-        start_date: eventRow.start_date,
-        end_date: eventRow.end_date,
-        max_participants: eventRow.max_participants,
-        venue: eventRow.venue_id ? {
-            venue_id: eventRow.venue_id,
-            name: eventRow.venue_name,
-            address: eventRow.venue_address,
-            capacity: eventRow.venue_capacity,
-            facilities: eventRow.venue_facilities
-        } : null
-    };
-}
-
-function buildPersonSnapshot(person) {
-    if (!person) return null;
-    return {
-        person_id: person.person_id,
-        first_name: person.first_name,
-        last_name: person.last_name,
-        email: person.email,
-        phone: person.phone
-    };
-}
-
-async function buildSubmissionDoc(mysqlPool, submissionId) {
-    const [submissionRows] = await mysqlPool.query(`
-        SELECT 
-            s.submission_id,
-            s.event_id,
-            s.project_name,
-            s.description,
-            s.submission_time,
-            s.technology_stack,
-            s.repository_url,
-            s.submission_type,
-            e.name AS event_name,
-            e.event_type,
-            e.start_date,
-            e.end_date,
-            e.max_participants,
-            v.venue_id,
-            v.name AS venue_name,
-            v.address AS venue_address,
-            v.capacity AS venue_capacity,
-            v.facilities AS venue_facilities
-        FROM Submission s
-        LEFT JOIN HackathonEvent e ON s.event_id = e.event_id
-        LEFT JOIN Venue v ON e.venue_id = v.venue_id
-        WHERE s.submission_id = ?
-        LIMIT 1
-    `, [submissionId]);
-
-    if (submissionRows.length === 0) return null;
-    const submission = submissionRows[0];
-
-    const [teamRows] = await mysqlPool.query(`
-        SELECT 
-            p.person_id,
-            p.first_name,
-            p.last_name,
-            p.email,
-            p.phone
-        FROM Person p
-        INNER JOIN Creates c ON p.person_id = c.person_id
-        WHERE c.submission_id = ?
-    `, [submissionId]);
-
-    return {
-        _id: submission.submission_id,
-        event_id: submission.event_id,
-        project_name: submission.project_name,
-        description: submission.description,
-        submission_time: submission.submission_time,
-        technology_stack: submission.technology_stack,
-        repository_url: submission.repository_url,
-        submission_type: submission.submission_type,
-        event_snapshot: buildEventSnapshot(submission),
-        team: teamRows.map(buildPersonSnapshot).filter(Boolean),
-        evaluations: []
-    };
-}
-
-async function syncSubmissionToMongo(req, submissionId) {
-    const mongoDB = req.mongoDB;
-    if (!mongoDB) return;
-
-    const submissionDoc = await buildSubmissionDoc(req.mysqlPool, submissionId);
-    if (!submissionDoc) return;
-
-    const teamIds = submissionDoc.team.map(member => member.person_id);
-    const submissionRef = {
-        submission_id: submissionDoc._id,
-        project_name: submissionDoc.project_name,
-        submission_time: submissionDoc.submission_time,
-        repository_url: submissionDoc.repository_url,
-        event_snapshot: submissionDoc.event_snapshot
-    };
-
-    await mongoDB.collection('submissions').updateOne(
-        { _id: submissionDoc._id },
-        { $set: submissionDoc },
-        { upsert: true }
-    );
-
-    await mongoDB.collection('participants').updateMany(
-        {},
-        { $pull: { submissions: { submission_id: submissionDoc._id } } }
-    );
-
-    if (teamIds.length > 0) {
-        await mongoDB.collection('participants').updateMany(
-            { _id: { $in: teamIds } },
-            { $addToSet: { submissions: submissionRef } }
-        );
-    }
-}
-
-async function removeSubmissionFromMongo(req, submissionId) {
-    const mongoDB = req.mongoDB;
-    if (!mongoDB) return;
-
-    await mongoDB.collection('submissions').deleteOne({ _id: submissionId });
-    await mongoDB.collection('participants').updateMany(
-        {},
-        { $pull: { submissions: { submission_id: submissionId } } }
-    );
-}
-
 // ========================================
 // IMPORTANT: Specific routes MUST come BEFORE dynamic routes (/:id)
 // Otherwise Express will treat "events" or "participants" as an ID
@@ -455,12 +321,6 @@ router.post('/', async (req, res) => {
             message: `Project submitted successfully to ${eventCheck[0].name}!`,
             data: newSubmission[0]
         });
-
-        try {
-            await syncSubmissionToMongo(req, submission_id);
-        } catch (mongoError) {
-            console.error('MongoDB sync error (create):', mongoError);
-        }
         
     } catch (error) {
         await conn.rollback();
@@ -622,12 +482,6 @@ router.put('/:id', async (req, res) => {
             message: 'Project updated successfully!',
             data: updatedSubmission[0]
         });
-
-        try {
-            await syncSubmissionToMongo(req, submissionId);
-        } catch (mongoError) {
-            console.error('MongoDB sync error (update):', mongoError);
-        }
         
     } catch (error) {
         await conn.rollback();
@@ -661,12 +515,6 @@ router.delete('/:id', async (req, res) => {
         
         await conn.commit();
         res.json({ success: true, message: 'Submission deleted successfully' });
-
-        try {
-            await removeSubmissionFromMongo(req, parseInt(req.params.id, 10));
-        } catch (mongoError) {
-            console.error('MongoDB sync error (delete):', mongoError);
-        }
         
     } catch (error) {
         await conn.rollback();

@@ -750,4 +750,373 @@ router.get('/analytics/workshops', async (req, res) => {
     }
 });
 
+// ==================== SUBMISSIONS (NoSQL) ====================
+
+// ==================== SUBMISSIONS (NoSQL) ====================
+// IMPORTANT: Specific routes MUST come BEFORE generic parameter routes
+
+// GET /api/nosql/submissions/events/available - Get available events for submission (MongoDB)
+router.get('/submissions/events/available', async (req, res) => {
+    try {
+        const mongoDB = req.mongoDB;
+        if (!mongoDB) {
+            return res.status(503).json({ success: false, error: 'MongoDB not connected' });
+        }
+
+        const events = await mongoDB.collection('events').find({}).toArray();
+
+        // Count submissions per event
+        const submissions = await mongoDB.collection('submissions').find({}).toArray();
+        const submissionCounts = {};
+        submissions.forEach(s => {
+            submissionCounts[s.event_id] = (submissionCounts[s.event_id] || 0) + 1;
+        });
+
+        const formattedEvents = events.map(e => ({
+            event_id: e._id,
+            name: e.name,
+            event_type: e.event_type,
+            start_date: e.start_date,
+            end_date: e.end_date,
+            max_participants: e.max_participants,
+            venue_name: e.venue ? e.venue.name : null,
+            submission_count: submissionCounts[e._id] || 0,
+            registration_count: e.registrations ? e.registrations.length : 0
+        }));
+
+        res.json({ success: true, data: formattedEvents });
+    } catch (error) {
+        console.error('Error fetching events from MongoDB:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// GET /api/nosql/submissions/participants/:eventId - Get participants for event (MongoDB)
+router.get('/submissions/participants/:eventId', async (req, res) => {
+    try {
+        const mongoDB = req.mongoDB;
+        if (!mongoDB) {
+            return res.status(503).json({ success: false, error: 'MongoDB not connected' });
+        }
+
+        const eventId = parseInt(req.params.eventId);
+
+        const event = await mongoDB.collection('events').findOne({ _id: eventId });
+
+        if (!event) {
+            return res.status(404).json({ success: false, error: 'Event not found' });
+        }
+
+        const participants = event.registrations ? event.registrations.map(reg => ({
+            person_id: reg.participant.person_id,
+            first_name: reg.participant.first_name,
+            last_name: reg.participant.last_name,
+            email: reg.participant.email,
+            registration_date: reg.registration_timestamp,
+            registration_number: reg.registration_number,
+            ticket_type: reg.ticket_type
+        })) : [];
+
+        res.json({ success: true, data: participants });
+    } catch (error) {
+        console.error('Error fetching participants from MongoDB:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// GET /api/nosql/submissions - Get all submissions from MongoDB
+router.get('/submissions', async (req, res) => {
+    try {
+        const mongoDB = req.mongoDB;
+        if (!mongoDB) {
+            return res.status(503).json({ success: false, error: 'MongoDB not connected' });
+        }
+
+        const submissions = await mongoDB.collection('submissions').find({}).toArray();
+
+        // Format the response to match SQL format
+        const formattedSubmissions = submissions.map(s => ({
+            submission_id: s._id,
+            event_id: s.event_id,
+            project_name: s.project_name,
+            description: s.description,
+            submission_time: s.submission_time,
+            technology_stack: s.technology_stack,
+            repository_url: s.repository_url,
+            submission_type: s.submission_type,
+            event_name: s.event_snapshot ? s.event_snapshot.name : null,
+            team_members: s.team ? s.team.map(t => `${t.first_name} ${t.last_name}`).join(', ') : null
+        }));
+
+        res.json({ success: true, data: formattedSubmissions });
+    } catch (error) {
+        console.error('Error fetching submissions from MongoDB:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// GET /api/nosql/submissions/:id - Get single submission from MongoDB
+router.get('/submissions/:id', async (req, res) => {
+    try {
+        const mongoDB = req.mongoDB;
+        if (!mongoDB) {
+            return res.status(503).json({ success: false, error: 'MongoDB not connected' });
+        }
+
+        const submission = await mongoDB.collection('submissions').findOne({ _id: parseInt(req.params.id) });
+        
+        if (!submission) {
+            return res.status(404).json({ success: false, error: 'Submission not found' });
+        }
+
+        // Format the response
+        const formatted = {
+            submission_id: submission._id,
+            event_id: submission.event_id,
+            project_name: submission.project_name,
+            description: submission.description,
+            submission_time: submission.submission_time,
+            technology_stack: submission.technology_stack,
+            repository_url: submission.repository_url,
+            submission_type: submission.submission_type,
+            event_name: submission.event_snapshot ? submission.event_snapshot.name : null,
+            team_member_ids: submission.team ? submission.team.map(t => t.person_id).join(',') : null,
+            team_members: submission.team ? submission.team.map(t => `${t.first_name} ${t.last_name}`).join(', ') : null
+        };
+
+        res.json({ success: true, data: formatted });
+    } catch (error) {
+        console.error('Error fetching submission from MongoDB:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// POST /api/nosql/submissions - Create new submission in MongoDB
+router.post('/submissions', async (req, res) => {
+    try {
+        const mongoDB = req.mongoDB;
+        if (!mongoDB) {
+            return res.status(503).json({ success: false, error: 'MongoDB not connected' });
+        }
+
+        const mysqlPool = req.mysqlPool;
+        const { 
+            event_id, 
+            project_name, 
+            description, 
+            technology_stack, 
+            repository_url, 
+            team_member_ids,
+            submission_type 
+        } = req.body;
+
+        // Validation
+        if (!project_name || !team_member_ids || team_member_ids.length === 0) {
+            return res.status(400).json({ 
+                success: false, 
+                error: 'Project name and at least one team member are required' 
+            });
+        }
+
+        if (!event_id) {
+            return res.status(400).json({ 
+                success: false, 
+                error: 'Event selection is required' 
+            });
+        }
+
+        // Get event from MySQL for snapshot
+        const [eventCheck] = await mysqlPool.query(
+            'SELECT e.*, v.name as venue_name, v.address, v.capacity FROM HackathonEvent e LEFT JOIN Venue v ON e.venue_id = v.venue_id WHERE e.event_id = ?',
+            [event_id]
+        );
+
+        if (eventCheck.length === 0) {
+            return res.status(404).json({ success: false, error: 'Event not found' });
+        }
+
+        const event = eventCheck[0];
+
+        // Get team member info from MySQL
+        const placeholders = team_member_ids.map(() => '?').join(',');
+        const [teamMembers] = await mysqlPool.query(
+            `SELECT person_id, first_name, last_name, email, phone FROM Person WHERE person_id IN (${placeholders})`,
+            team_member_ids
+        );
+
+        // Get next submission ID
+        const submissions = await mongoDB.collection('submissions').find({}).toArray();
+        const nextId = submissions.length > 0 ? Math.max(...submissions.map(s => s._id)) + 1 : 1;
+
+        // Create submission document
+        const newSubmission = {
+            _id: nextId,
+            event_id,
+            project_name,
+            description,
+            submission_time: new Date(),
+            technology_stack,
+            repository_url,
+            submission_type,
+            event_snapshot: {
+                event_id: event.event_id,
+                name: event.name,
+                event_type: event.event_type,
+                start_date: event.start_date,
+                end_date: event.end_date,
+                max_participants: event.max_participants,
+                venue: {
+                    venue_id: event.venue_id,
+                    name: event.venue_name,
+                    address: event.address,
+                    capacity: event.capacity
+                }
+            },
+            team: teamMembers.map(member => ({
+                person_id: member.person_id,
+                first_name: member.first_name,
+                last_name: member.last_name,
+                email: member.email,
+                phone: member.phone
+            })),
+            evaluations: []
+        };
+
+        const result = await mongoDB.collection('submissions').insertOne(newSubmission);
+
+        res.json({ 
+            success: true, 
+            message: 'Submission created successfully',
+            submission_id: nextId,
+            data: newSubmission 
+        });
+    } catch (error) {
+        console.error('Error creating submission in MongoDB:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// PUT /api/nosql/submissions/:id - Update submission in MongoDB
+router.put('/submissions/:id', async (req, res) => {
+    try {
+        const mongoDB = req.mongoDB;
+        if (!mongoDB) {
+            return res.status(503).json({ success: false, error: 'MongoDB not connected' });
+        }
+
+        const mysqlPool = req.mysqlPool;
+        const submissionId = parseInt(req.params.id);
+        const { 
+            event_id, 
+            project_name, 
+            description, 
+            technology_stack, 
+            repository_url, 
+            team_member_ids,
+            submission_type 
+        } = req.body;
+
+        // Validation
+        if (!project_name || !team_member_ids || team_member_ids.length === 0) {
+            return res.status(400).json({ 
+                success: false, 
+                error: 'Project name and at least one team member are required' 
+            });
+        }
+
+        // Check if submission exists
+        const existing = await mongoDB.collection('submissions').findOne({ _id: submissionId });
+        if (!existing) {
+            return res.status(404).json({ success: false, error: 'Submission not found' });
+        }
+
+        // Get event from MySQL for snapshot
+        const [eventCheck] = await mysqlPool.query(
+            'SELECT e.*, v.name as venue_name, v.address, v.capacity FROM HackathonEvent e LEFT JOIN Venue v ON e.venue_id = v.venue_id WHERE e.event_id = ?',
+            [event_id]
+        );
+
+        if (eventCheck.length === 0) {
+            return res.status(404).json({ success: false, error: 'Event not found' });
+        }
+
+        const event = eventCheck[0];
+
+        // Get team member info
+        const placeholders = team_member_ids.map(() => '?').join(',');
+        const [teamMembers] = await mysqlPool.query(
+            `SELECT person_id, first_name, last_name, email, phone FROM Person WHERE person_id IN (${placeholders})`,
+            team_member_ids
+        );
+
+        // Update submission
+        const updatedSubmission = {
+            event_id,
+            project_name,
+            description,
+            technology_stack,
+            repository_url,
+            submission_type,
+            event_snapshot: {
+                event_id: event.event_id,
+                name: event.name,
+                event_type: event.event_type,
+                start_date: event.start_date,
+                end_date: event.end_date,
+                max_participants: event.max_participants,
+                venue: {
+                    venue_id: event.venue_id,
+                    name: event.venue_name,
+                    address: event.address,
+                    capacity: event.capacity
+                }
+            },
+            team: teamMembers.map(member => ({
+                person_id: member.person_id,
+                first_name: member.first_name,
+                last_name: member.last_name,
+                email: member.email,
+                phone: member.phone
+            }))
+        };
+
+        await mongoDB.collection('submissions').updateOne(
+            { _id: submissionId },
+            { $set: updatedSubmission }
+        );
+
+        res.json({ 
+            success: true, 
+            message: 'Submission updated successfully',
+            data: { _id: submissionId, ...updatedSubmission }
+        });
+    } catch (error) {
+        console.error('Error updating submission in MongoDB:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// DELETE /api/nosql/submissions/:id - Delete submission from MongoDB
+router.delete('/submissions/:id', async (req, res) => {
+    try {
+        const mongoDB = req.mongoDB;
+        if (!mongoDB) {
+            return res.status(503).json({ success: false, error: 'MongoDB not connected' });
+        }
+
+        const submissionId = parseInt(req.params.id);
+
+        const result = await mongoDB.collection('submissions').deleteOne({ _id: submissionId });
+
+        if (result.deletedCount === 0) {
+            return res.status(404).json({ success: false, error: 'Submission not found' });
+        }
+
+        res.json({ success: true, message: 'Submission deleted successfully' });
+    } catch (error) {
+        console.error('Error deleting submission from MongoDB:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 module.exports = router;

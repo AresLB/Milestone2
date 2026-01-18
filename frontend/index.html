@@ -64,6 +64,15 @@
                 inherits from Person)</p>
 
             <div class="card">
+                <h3>Database Mode</h3>
+                <div class="db-toggle">
+                    <button class="toggle-btn active" data-db="sql" onclick="setSubmissionDbMode('sql')">SQL (MariaDB)</button>
+                    <button class="toggle-btn" data-db="nosql" onclick="setSubmissionDbMode('nosql')">NoSQL (MongoDB)</button>
+                </div>
+                <p class="hint" id="submission-db-hint">Currently using: <strong>SQL (MariaDB)</strong></p>
+            </div>
+
+            <div class="card">
                 <form id="submit-project-form">
                     <!-- NEW: Event Selection -->
                     <div class="form-group">
@@ -128,8 +137,13 @@
             </div>
 
             <div class="card">
-                <h3>Current Submissions</h3>
-                <div id="submissions-list">Loading...</div>
+                <h3>Current Submissions (MYSQL)</h3>
+                <div id="submissions-list-sql">Loading...</div>
+            </div>
+
+            <div class="card">
+                <h3>Current Submissions (MONGODB)</h3>
+                <div id="submissions-list-nosql">Loading...</div>
             </div>
         </section>
 

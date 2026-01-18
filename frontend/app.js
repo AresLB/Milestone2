@@ -2,6 +2,8 @@
 const API_BASE = '/api';
 let editingSubmissionId = null;
 
+// Database mode for Student 1 (submissions)
+let submissionDbMode = 'sql'; // 'sql' or 'nosql'
 // Database mode for Student 2 (workshops)
 let workshopDbMode = 'sql'; // 'sql' or 'nosql'
 let analyticsS2DbMode = 'sql'; // 'sql' or 'nosql'
@@ -159,7 +161,11 @@ async function loadDashboard() {
 // Load available events for submission
 async function loadEventsForSubmission() {
     try {
-        const data = await apiCall('/submissions/events/available');
+        const endpoint = submissionDbMode === 'sql' 
+            ? '/submissions/events/available' 
+            : '/nosql/submissions/events/available';
+        
+        const data = await apiCall(endpoint);
         
         const selectHtml = data.data.map(e => 
             `<option value="${e.event_id}">${e.name} (${e.event_type}) - ${new Date(e.start_date).toLocaleDateString()} [${e.registration_count} registered, ${e.submission_count} submissions]</option>`
@@ -187,7 +193,11 @@ async function loadParticipantsForProject(eventId) {
             return;
         }
         
-        const data = await apiCall(`/submissions/participants/${eventId}`);
+        const endpoint = submissionDbMode === 'sql'
+            ? `/submissions/participants/${eventId}`
+            : `/nosql/submissions/participants/${eventId}`;
+        
+        const data = await apiCall(endpoint);
         
         if (data.data.length === 0) {
             document.getElementById('team-members-list').innerHTML = '<p class="empty-state">No participants registered for this event yet.</p>';
@@ -276,7 +286,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function loadSubmissions() {
     try {
-        const data = await apiCall('/submissions');
+        const endpoint = submissionDbMode === 'sql' ? '/submissions' : '/nosql/submissions';
+        const data = await apiCall(endpoint);
         
         const tableHtml = data.data.length > 0
             ? `<div class="table-wrapper">
@@ -355,7 +366,8 @@ function resetSubmissionForm() {
 
 async function startEditSubmission(id) {
     try {
-        const result = await apiCall(`/submissions/${id}`);
+        const endpoint = submissionDbMode === 'sql' ? `/submissions/${id}` : `/nosql/submissions/${id}`;
+        const result = await apiCall(endpoint);
         const submission = result.data;
         if (!submission) {
             showToast('Submission not found', 'error');
@@ -448,7 +460,9 @@ document.getElementById('submit-project-form').addEventListener('submit', async 
     };
     
     try {
-        const endpoint = editingSubmissionId ? `/submissions/${editingSubmissionId}` : '/submissions';
+        const baseEndpoint = editingSubmissionId ? `/submissions/${editingSubmissionId}` : '/submissions';
+        const nosqlEndpoint = editingSubmissionId ? `/nosql/submissions/${editingSubmissionId}` : '/nosql/submissions';
+        const endpoint = submissionDbMode === 'sql' ? baseEndpoint : nosqlEndpoint;
         const method = editingSubmissionId ? 'PUT' : 'POST';
         const result = await apiCall(endpoint, {
             method,
@@ -471,7 +485,8 @@ async function deleteSubmission(id) {
     if (!confirm('Are you sure you want to delete this submission?')) return;
     
     try {
-        await apiCall(`/submissions/${id}`, { method: 'DELETE' });
+        const endpoint = submissionDbMode === 'sql' ? `/submissions/${id}` : `/nosql/submissions/${id}`;
+        await apiCall(endpoint, { method: 'DELETE' });
         showToast('Submission deleted', 'success');
         loadSubmissions();
     } catch (error) {
@@ -482,6 +497,29 @@ async function deleteSubmission(id) {
 // ==================== MANAGE WORKSHOPS (Student 2) ====================
 
 let editingWorkshop = null; // Stores {event_id, workshop_number} when editing
+
+// Toggle database mode for submissions
+function setSubmissionDbMode(mode) {
+    submissionDbMode = mode;
+
+    // Update toggle button states
+    const toggleBtns = document.querySelectorAll('#submit-project .toggle-btn');
+    toggleBtns.forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.db === mode);
+    });
+
+    // Update hint text
+    const hint = document.getElementById('submission-db-hint');
+    if (hint) {
+        const dbName = mode === 'sql' ? 'SQL (MariaDB)' : 'NoSQL (MongoDB)';
+        hint.innerHTML = `Currently using: <strong>${dbName}</strong>`;
+    }
+
+    // Reset form and reload data
+    resetSubmissionForm();
+    loadEventsForSubmission();
+    loadSubmissions();
+}
 
 // Toggle database mode for workshops
 function setWorkshopDbMode(mode) {

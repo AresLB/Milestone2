@@ -97,7 +97,7 @@ group05/
 3. **Access the application:**
 
    * Open a browser and navigate to:
-     [http://localhost:3000](http://localhost:3000)
+     [http://localhost:3000](http://localhost:3001)
 
 
 **Note:**

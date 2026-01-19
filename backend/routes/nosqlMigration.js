@@ -596,6 +596,180 @@ router.post('/indexes/create', async (req, res) => {
     }
 });
 
+// ==================== STUDENT 1 INDEXING (Task 2.3.5) ====================
+
+// POST /api/nosql/indexes/submissions/create - Create indexes for submission analytics (Student 1)
+router.post('/indexes/submissions/create', async (req, res) => {
+    try {
+        const mongoDB = req.mongoDB;
+        if (!mongoDB) {
+            return res.status(503).json({ success: false, error: 'MongoDB not connected' });
+        }
+
+        const createdIndexes = [];
+
+        // Index 1: submission_time for date range filtering (primary filter field)
+        const indexResult1 = await mongoDB.collection('submissions').createIndex(
+            { 'submission_time': 1 },
+            { name: 'idx_submission_time' }
+        );
+        createdIndexes.push({ name: 'idx_submission_time', field: 'submission_time', result: indexResult1 });
+
+        // Index 2: event_id for event-based lookups
+        const indexResult2 = await mongoDB.collection('submissions').createIndex(
+            { 'event_id': 1 },
+            { name: 'idx_submission_event_id' }
+        );
+        createdIndexes.push({ name: 'idx_submission_event_id', field: 'event_id', result: indexResult2 });
+
+        // Index 3: Compound index for submission_time + event_id (common query pattern)
+        const indexResult3 = await mongoDB.collection('submissions').createIndex(
+            { 'submission_time': 1, 'event_id': 1 },
+            { name: 'idx_submission_time_event' }
+        );
+        createdIndexes.push({ name: 'idx_submission_time_event', field: 'submission_time + event_id', result: indexResult3 });
+
+        // Index 4: team.person_id for participant lookups
+        const indexResult4 = await mongoDB.collection('submissions').createIndex(
+            { 'team.person_id': 1 },
+            { name: 'idx_team_person_id' }
+        );
+        createdIndexes.push({ name: 'idx_team_person_id', field: 'team.person_id', result: indexResult4 });
+
+        res.json({
+            success: true,
+            message: 'Student 1 submission indexes created successfully',
+            indexes: createdIndexes
+        });
+    } catch (error) {
+        console.error('Index creation error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// GET /api/nosql/indexes/submissions/list - List all indexes on submissions collection
+router.get('/indexes/submissions/list', async (req, res) => {
+    try {
+        const mongoDB = req.mongoDB;
+        if (!mongoDB) {
+            return res.status(503).json({ success: false, error: 'MongoDB not connected' });
+        }
+
+        const indexes = await mongoDB.collection('submissions').indexes();
+        res.json({
+            success: true,
+            collection: 'submissions',
+            indexCount: indexes.length,
+            indexes: indexes
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// GET /api/nosql/analytics/submissions/explain - Get execution stats for submission analytics (BEFORE index)
+router.get('/analytics/submissions/explain', async (req, res) => {
+    try {
+        const mongoDB = req.mongoDB;
+        if (!mongoDB) {
+            return res.status(503).json({ success: false, error: 'MongoDB not connected' });
+        }
+
+        const { startDate, endDate } = req.query;
+        const filterStartDate = startDate ? new Date(startDate) : new Date('2025-10-10');
+        const filterEndDate = endDate ? new Date(endDate) : new Date('2026-02-28');
+
+        // Build the query that matches the analytics report
+        const query = {
+            submission_time: {
+                $gte: filterStartDate,
+                $lte: filterEndDate
+            }
+        };
+
+        // Get execution stats using explain
+        const explainResult = await mongoDB.collection('submissions')
+            .find(query)
+            .explain('executionStats');
+
+        // Extract key metrics
+        const executionStats = explainResult.executionStats || {};
+        const queryPlanner = explainResult.queryPlanner || {};
+        const winningPlan = queryPlanner.winningPlan || {};
+
+        // Determine if index was used
+        let indexUsed = 'COLLSCAN (no index)';
+        if (winningPlan.inputStage) {
+            if (winningPlan.inputStage.indexName) {
+                indexUsed = winningPlan.inputStage.indexName;
+            } else if (winningPlan.inputStage.stage === 'IXSCAN') {
+                indexUsed = winningPlan.inputStage.indexName || 'Index Scan';
+            } else if (winningPlan.stage === 'IXSCAN') {
+                indexUsed = winningPlan.indexName || 'Index Scan';
+            }
+        }
+        if (winningPlan.stage === 'IXSCAN') {
+            indexUsed = winningPlan.indexName || 'Index Scan';
+        }
+
+        res.json({
+            success: true,
+            filter: {
+                startDate: filterStartDate.toISOString(),
+                endDate: filterEndDate.toISOString()
+            },
+            executionStats: {
+                totalDocsExamined: executionStats.totalDocsExamined || 0,
+                totalKeysExamined: executionStats.totalKeysExamined || 0,
+                nReturned: executionStats.nReturned || 0,
+                executionTimeMillis: executionStats.executionTimeMillis || 0,
+                indexUsed: indexUsed,
+                stage: winningPlan.stage || 'N/A'
+            },
+            queryPlanner: {
+                plannerVersion: queryPlanner.plannerVersion,
+                namespace: queryPlanner.namespace,
+                winningPlanStage: winningPlan.stage
+            },
+            fullExplain: explainResult
+        });
+    } catch (error) {
+        console.error('Explain error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// DELETE /api/nosql/indexes/submissions/drop - Drop all custom indexes (for testing before/after)
+router.delete('/indexes/submissions/drop', async (req, res) => {
+    try {
+        const mongoDB = req.mongoDB;
+        if (!mongoDB) {
+            return res.status(503).json({ success: false, error: 'MongoDB not connected' });
+        }
+
+        // Get current indexes
+        const currentIndexes = await mongoDB.collection('submissions').indexes();
+        const droppedIndexes = [];
+
+        // Drop all indexes except _id
+        for (const index of currentIndexes) {
+            if (index.name !== '_id_') {
+                await mongoDB.collection('submissions').dropIndex(index.name);
+                droppedIndexes.push(index.name);
+            }
+        }
+
+        res.json({
+            success: true,
+            message: 'Custom indexes dropped successfully',
+            droppedIndexes: droppedIndexes
+        });
+    } catch (error) {
+        console.error('Drop index error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 // GET /api/nosql/indexes/list - List all indexes on events collection
 router.get('/indexes/list', async (req, res) => {
     try {

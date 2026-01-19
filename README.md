@@ -70,7 +70,7 @@ group05/
 
 ---
 
-## Running the Application with Docker
+## Running the Application
 
 1. **Start all services:**
 
@@ -79,30 +79,16 @@ group05/
    docker compose up --build
    ```
 
-2. **Access the application:**
-
-   * Open a browser and navigate to:
-     [http://localhost:3000](http://localhost:3000)
-
-**Note:**
-If a port conflict occurs, you can change the backend port in `server.js`:
-
-```js
-const PORT = process.env.PORT || 3000;
-```
-
 ---
 
-## Running the Application Locally (Without Docker)
-
-1. **Install backend dependencies:**
+2. **Install backend dependencies:**
 
    ```bash
    cd backend
    npm install
    ```
 
-2. **Start the backend server:**
+3. **Start the backend server:**
 
    ```bash
    npm start
@@ -112,3 +98,11 @@ const PORT = process.env.PORT || 3000;
 
    * Open a browser and navigate to:
      [http://localhost:3000](http://localhost:3000)
+
+
+**Note:**
+If a port conflict occurs, you can change the backend port in `server.js`:
+
+```js
+const PORT = process.env.PORT || 3000;
+```

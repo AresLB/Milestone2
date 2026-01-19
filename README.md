@@ -101,7 +101,7 @@ group05/
 
 
 **Note:**
-If a port conflict occurs, you can change the backend port in `server.js`:
+If a port conflict occurs, you can change the port in `server.js`:
 
 ```js
 const PORT = process.env.PORT || 3000;

@@ -4,6 +4,8 @@ let editingSubmissionId = null;
 
 // Database mode for Student 1 (submissions)
 let submissionDbMode = 'sql'; // 'sql' or 'nosql'
+// Database mode for Student 1 (analytics)
+let analyticsDbMode = 'sql'; // 'sql' or 'nosql'
 // Database mode for Student 2 (workshops)
 let workshopDbMode = 'sql'; // 'sql' or 'nosql'
 let analyticsS2DbMode = 'sql'; // 'sql' or 'nosql'
@@ -97,16 +99,10 @@ function loadSectionData(sectionId) {
 
 async function loadDashboard() {
     try {
-        // Load summary stats
-        const summary = await apiCall('/analytics/summary');
-        
-        document.getElementById('stat-events').textContent = summary.stats.totalEvents;
-        document.getElementById('stat-participants').textContent = summary.stats.totalParticipants;
-        document.getElementById('stat-submissions').textContent = summary.stats.totalSubmissions;
-        document.getElementById('stat-registrations').textContent = summary.stats.totalRegistrations;
-        
-        // Recent submissions
-        const recentHtml = summary.recentSubmissions.length > 0 
+        // Load all submissions from MySQL
+        const mysqlData = await apiCall('/submissions');
+        const recentMySQLSubmissions = mysqlData.data;
+        const recentMySQLHtml = recentMySQLSubmissions.length > 0 
             ? `<div class="table-wrapper">
                 <table class="data-table">
                     <thead>
@@ -122,12 +118,12 @@ async function loadDashboard() {
                         </tr>
                     </thead>
                     <tbody>
-                        ${summary.recentSubmissions.map(s => `
+                        ${recentMySQLSubmissions.map((s, index) => `
                             <tr>
                                 <td>${s.event_name || 'Unassigned'}</td>
                                 <td>${s.project_name}</td>
                                 <td><span class="badge ${s.submission_type === 'team' ? 'badge-info' : 'badge-success'}">${s.submission_type || 'Unassigned'}</span></td>
-                                <td>${s.team || 'Unassigned'}</td>
+                                <td>${s.team_members || 'Unassigned'}</td>
                                 <td>${s.description || 'Unassigned'}</td>
                                 <td>${s.technology_stack || 'Unassigned'}</td>
                                 <td>${s.repository_url ? `<a href="${s.repository_url}" target="_blank" rel="noopener noreferrer">Repo</a>` : 'Unassigned'}</td>
@@ -139,7 +135,45 @@ async function loadDashboard() {
                </div>`
             : '<p class="empty-state">No submissions yet</p>';
         
-        document.getElementById('recent-submissions').innerHTML = recentHtml;
+        document.getElementById('recent-submissions-sql').innerHTML = recentMySQLHtml;
+
+        // Load all submissions from MongoDB
+        const mongoData = await apiCall('/nosql/submissions');
+        const recentMongoSubmissions = mongoData.data;
+        const recentMongoHtml = recentMongoSubmissions.length > 0 
+            ? `<div class="table-wrapper">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Event Name</th>
+                            <th>Project Name</th>
+                            <th>Type</th>
+                            <th>Participants</th>
+                            <th>Description</th>
+                            <th>Technology Stack</th>
+                            <th>GitHub Repo</th>
+                            <th>Submitted</th>                   
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${recentMongoSubmissions.map((s, index) => `
+                            <tr>
+                                <td>${s.event_name || 'Unassigned'}</td>
+                                <td>${s.project_name}</td>
+                                <td><span class="badge ${s.submission_type === 'team' ? 'badge-info' : 'badge-success'}">${s.submission_type || 'Unassigned'}</span></td>
+                                <td>${s.team_members || 'Unassigned'}</td>
+                                <td>${s.description || 'Unassigned'}</td>
+                                <td>${s.technology_stack || 'Unassigned'}</td>
+                                <td>${s.repository_url ? `<a href="${s.repository_url}" target="_blank" rel="noopener noreferrer">Repo</a>` : 'Unassigned'}</td>
+                                <td>${new Date(s.submission_time).toLocaleString()}</td>                              
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+               </div>`
+            : '<p class="empty-state">No submissions yet</p>';
+        
+        document.getElementById('recent-submissions-nosql').innerHTML = recentMongoHtml;
         
         // Health check
         const health = await apiCall('/health');
@@ -596,6 +630,27 @@ function setWorkshopDbMode(mode) {
     loadWorkshops();
 }
 
+// Toggle database mode for analytics S1
+function setAnalyticsDbMode(mode) {
+    analyticsDbMode = mode;
+
+    // Update toggle button states
+    const toggleBtns = document.querySelectorAll('#analytics-s1 .toggle-btn');
+    toggleBtns.forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.db === mode);
+    });
+
+    // Update hint text
+    const hint = document.getElementById('analytics-db-hint');
+    if (hint) {
+        const dbName = mode === 'sql' ? 'SQL (MariaDB)' : 'NoSQL (MongoDB)';
+        hint.innerHTML = `Currently using: <strong>${dbName}</strong>`;
+    }
+
+    // Reload analytics data
+    loadSubmissionAnalytics();
+}
+
 async function loadEventsForWorkshops() {
     try {
         // Use different endpoint based on database mode
@@ -784,7 +839,11 @@ async function loadSubmissionAnalytics() {
     const endDate = document.getElementById('filter-end-date').value;
     
     try {
-        const data = await apiCall(`/analytics/submissions?startDate=${startDate}&endDate=${endDate}`);
+        const endpoint = analyticsDbMode === 'sql' 
+            ? `/analytics/submissions?startDate=${startDate}&endDate=${endDate}`
+            : `/nosql/analytics/submissions?startDate=${startDate}&endDate=${endDate}`;
+        
+        const data = await apiCall(endpoint);
         
         // Summary
         const summaryHtml = `
@@ -809,29 +868,43 @@ async function loadSubmissionAnalytics() {
         `;
         document.getElementById('analytics-s1-summary').innerHTML = summaryHtml;
         
-        // Table
+        // Table - Display all required entity attributes and calculated fields
         const tableHtml = data.data.length > 0
             ? `<div class="table-wrapper">
                 <table class="data-table">
                     <thead>
                         <tr>
-                            <th>Project</th>
-                            <th>Event</th>
+                            <th>Submission ID</th>
+                            <th>Project Name</th>
+                            <th>Description</th>
+                            <th>Submission Time</th>
+                            <th>Technology Stack</th>
+                            <th>Repository URL</th>
                             <th>Participant</th>
                             <th>Email</th>
-                            <th>Submitted</th>
-                            <th>Days Since Reg</th>
+                            <th>Registration Date</th>
+                            <th>T-Shirt Size</th>
+                            <th>Dietary Restrictions</th>
+                            <th>Days Since Registration</th>
+                            <th>Total Submissions</th>
                         </tr>
                     </thead>
                     <tbody>
                         ${data.data.map(r => `
                             <tr>
+                                <td>${r.submission_id}</td>
                                 <td>${r.project_name}</td>
-                                <td>${r.event_name || 'Unassigned'}</td>
+                                <td>${r.description ? (r.description.length > 50 ? r.description.substring(0, 50) + '...' : r.description) : 'N/A'}</td>
+                                <td>${new Date(r.submission_time).toLocaleString()}</td>
+                                <td>${r.technology_stack || 'N/A'}</td>
+                                <td>${r.repository_url ? `<a href="${r.repository_url}" target="_blank" rel="noopener noreferrer">Link</a>` : 'N/A'}</td>
                                 <td>${r.participant_first_name} ${r.participant_last_name}</td>
                                 <td>${r.participant_email}</td>
-                                <td>${new Date(r.submission_time).toLocaleString()}</td>
-                                <td>${r.days_since_registration}</td>
+                                <td>${r.registration_date ? new Date(r.registration_date).toLocaleDateString() : 'N/A'}</td>
+                                <td>${r.t_shirt_size || 'N/A'}</td>
+                                <td>${r.dietary_restrictions || 'None'}</td>
+                                <td>${r.days_since_registration !== null ? r.days_since_registration + ' days' : 'N/A'}</td>
+                                <td>${r.total_submissions_by_participant}</td>
                             </tr>
                         `).join('')}
                     </tbody>

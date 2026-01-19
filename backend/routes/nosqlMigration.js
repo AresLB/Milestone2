@@ -664,7 +664,126 @@ router.get('/analytics/workshops/explain', async (req, res) => {
     }
 });
 
-// GET /api/nosql/analytics/workshops - Workshop Analytics Report (Student 2)
+// GET /api/nosql/analytics/submissions - Submission Analytics Report (Student 1)
+router.get('/analytics/submissions', async (req, res) => {
+    try {
+        const mongoDB = req.mongoDB;
+        if (!mongoDB) {
+            return res.status(503).json({ success: false, error: 'MongoDB not connected' });
+        }
+
+        const { startDate, endDate } = req.query;
+
+        // Default filter: same as SQL - submissions after October 10, 2025
+        const filterStartDate = startDate ? new Date(startDate) : new Date('2025-10-10');
+        const filterEndDate = endDate ? new Date(endDate) : new Date('2026-02-28');
+
+        // First, get all submissions within date range
+        const submissions = await mongoDB.collection('submissions').find({
+            submission_time: {
+                $gte: filterStartDate,
+                $lte: filterEndDate
+            }
+        }).sort({ submission_time: -1 }).toArray();
+
+        // Get all participants to lookup registration_date, t_shirt_size, dietary_restrictions
+        const participants = await mongoDB.collection('participants').find({}).toArray();
+        const participantsById = new Map(participants.map(p => [p._id, p]));
+
+        // Count total submissions per participant
+        const allSubmissions = await mongoDB.collection('submissions').find({}).toArray();
+        const submissionCountByPerson = {};
+        allSubmissions.forEach(s => {
+            if (s.team) {
+                s.team.forEach(member => {
+                    submissionCountByPerson[member.person_id] = (submissionCountByPerson[member.person_id] || 0) + 1;
+                });
+            }
+        });
+
+        // Build results with all required fields (one row per participant per submission)
+        const results = [];
+        submissions.forEach(s => {
+            if (s.team && s.team.length > 0) {
+                s.team.forEach(member => {
+                    const participant = participantsById.get(member.person_id);
+                    const registrationDate = participant?.participant?.registration_date
+                        ? new Date(participant.participant.registration_date)
+                        : null;
+                    const submissionTime = new Date(s.submission_time);
+
+                    // Calculate days_since_registration
+                    let daysSinceRegistration = null;
+                    if (registrationDate) {
+                        const diffTime = submissionTime - registrationDate;
+                        daysSinceRegistration = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+                    }
+
+                    results.push({
+                        submission_id: s._id,
+                        project_name: s.project_name,
+                        description: s.description,
+                        submission_time: s.submission_time,
+                        technology_stack: s.technology_stack,
+                        repository_url: s.repository_url,
+                        event_name: s.event_snapshot?.name || null,
+                        event_type: s.event_snapshot?.event_type || null,
+                        person_id: member.person_id,
+                        participant_first_name: member.first_name,
+                        participant_last_name: member.last_name,
+                        participant_email: member.email,
+                        registration_date: participant?.participant?.registration_date || null,
+                        t_shirt_size: participant?.participant?.t_shirt_size || null,
+                        dietary_restrictions: participant?.participant?.dietary_restrictions || null,
+                        days_since_registration: daysSinceRegistration,
+                        total_submissions_by_participant: submissionCountByPerson[member.person_id] || 0
+                    });
+                });
+            }
+        });
+
+        // Sort by submission_id ASC, then last_name ASC
+        results.sort((a, b) => {
+            const idCompare = a.submission_id - b.submission_id;
+            if (idCompare !== 0) return idCompare;
+            return (a.participant_last_name || '').localeCompare(b.participant_last_name || '');
+        });
+
+        // Calculate summary statistics
+        const uniqueSubmissions = [...new Set(results.map(r => r.submission_id))].length;
+        const uniqueParticipants = [...new Set(results.map(r => r.person_id))].length;
+
+        // Technology stack analysis
+        const techStacks = {};
+        results.forEach(r => {
+            if (r.technology_stack) {
+                const techs = r.technology_stack.split(',').map(t => t.trim());
+                techs.forEach(tech => {
+                    techStacks[tech] = (techStacks[tech] || 0) + 1;
+                });
+            }
+        });
+
+        res.json({
+            success: true,
+            filter: {
+                startDate: filterStartDate.toISOString(),
+                endDate: filterEndDate.toISOString()
+            },
+            summary: {
+                totalRecords: results.length,
+                uniqueSubmissions,
+                uniqueParticipants,
+                technologyUsage: techStacks
+            },
+            data: results
+        });
+    } catch (error) {
+        console.error('NoSQL analytics error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 router.get('/analytics/workshops', async (req, res) => {
     try {
         const mongoDB = req.mongoDB;

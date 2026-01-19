@@ -22,7 +22,7 @@ router.get('/submissions', async (req, res) => {
                 s.repository_url,
                 e.name AS event_name,
                 e.event_type AS event_type,
-                
+
                 -- Participant Information (from Person and Participant entities)
                 p.person_id,
                 p.first_name AS participant_first_name,
@@ -31,11 +31,12 @@ router.get('/submissions', async (req, res) => {
                 pt.registration_date,
                 pt.t_shirt_size,
                 pt.dietary_restrictions,
-                
-                -- Time-based statistics
-                DATEDIFF(CURRENT_DATE, pt.registration_date) AS days_since_registration,
-                
-                -- Submission count per participant
+
+                -- Calculated Fields
+                -- days_since_registration: time difference between registration and project submission
+                DATEDIFF(s.submission_time, pt.registration_date) AS days_since_registration,
+
+                -- total_submissions_by_participant: total number of projects submitted by each participant
                 (SELECT COUNT(*)
                  FROM Creates c2
                  WHERE c2.person_id = pt.person_id) AS total_submissions_by_participant
@@ -51,14 +52,14 @@ router.get('/submissions', async (req, res) => {
             WHERE s.submission_time >= ? AND s.submission_time <= ?
             
             ORDER BY
-                s.submission_time DESC,
+                s.submission_id ASC,
                 p.last_name ASC
         `, [filterStartDate, filterEndDate]);
         
         // Calculate summary statistics
         const uniqueSubmissions = [...new Set(results.map(r => r.submission_id))].length;
         const uniqueParticipants = [...new Set(results.map(r => r.person_id))].length;
-        
+
         // Technology stack analysis
         const techStacks = {};
         results.forEach(r => {
@@ -69,7 +70,7 @@ router.get('/submissions', async (req, res) => {
                 });
             }
         });
-        
+
         res.json({
             success: true,
             filter: {
